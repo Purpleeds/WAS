@@ -1,0 +1,1227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W.O.N Dares</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f4f5f7;
+    --surface-2: #e8ebee;
+    --ink: #1d2127;
+    --muted: #7a818b;
+    --hair: #e2e5e9;
+    --spend: #d4433b;
+    --focus: #3567e0;
+    --lead: #2f8a57;
+    --circle: 260px;
+    /* Wheel of Names framing: the link shows its wheels stacked vertically, so
+       each circle loads the same page shifted up to show one of them. Each
+       frame is cut off just below its wheel so the wheel sits in the middle
+       of the frame, which is where Wheel of Names opens its winner popup. */
+    --frame-w: 520px;
+    --frame-scale: 0.5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181c;
+      --surface: #1f2328;
+      --surface-2: #2a2f36;
+      --ink: #eceff3;
+      --muted: #8b949f;
+      --hair: #2c3239;
+      --spend: #f0786e;
+      --focus: #7ea3f5;
+      --lead: #6fcf97;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 500 15px/1.45 "Quicksand", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 28px 16px 64px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px 20px; flex-wrap: wrap; margin-bottom: 36px;
+  }
+  h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+  .toolbar { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; }
+  .save-state { font-size: .8rem; color: var(--muted); min-width: 56px; text-align: right; margin-left: 6px; }
+
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; color: var(--ink);
+    background: transparent; border: 0; border-radius: 8px; padding: 7px 11px;
+  }
+  button:hover:not(:disabled) { background: var(--surface); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  #spinAll { background: var(--ink); color: var(--bg); margin-left: 6px; }
+  #spinAll:hover:not(:disabled) { background: var(--ink); opacity: .85; }
+
+  .mode { display: inline-flex; background: var(--surface); border-radius: 9px; padding: 2px; margin-right: 6px; }
+  .mode button { padding: 5px 10px; border-radius: 7px; color: var(--muted); }
+  .mode button:hover:not(:disabled) { background: transparent; color: var(--ink); }
+  .mode button[aria-pressed="true"] { background: var(--bg); color: var(--ink); }
+
+  /* ---------- wheels ---------- */
+  .wheels, .players {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 28px 32px;
+  }
+  .wheels { justify-items: center; margin-bottom: 32px; }
+  .wheel-slot { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .wheel-caption { font-size: .9rem; color: var(--muted); }
+
+  .wheel-circle {
+    width: var(--circle); height: var(--circle);
+    border-radius: 50%; border: 1px solid var(--hair);
+    background: var(--surface); position: relative;
+    /* clip (not hidden) so the browser can't scroll the circle when a popup takes focus */
+    overflow: hidden; overflow: clip;
+  }
+  .wheel-circle iframe {
+    position: absolute; border: none; left: 0;
+    width: var(--frame-w); height: var(--frame-h);
+    top: var(--frame-y);
+    transform: scale(var(--frame-scale)); transform-origin: 0 0;
+  }
+  .wheel-circle.builtin { width: min(280px, 100%); height: auto; aspect-ratio: 1; border: 0; background: transparent; }
+  .wheel-circle canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+
+  .popup {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: rgba(20, 24, 28, .18);
+  }
+  .popup-card {
+    width: 82%; background: #fff; color: #1d2127; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+    animation: pop-in .18s ease-out;
+  }
+  @keyframes pop-in { from { transform: scale(.8); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .popup-card { animation: none; } }
+  .popup-head { padding: 6px 12px; font-size: .78rem; font-weight: 700; color: #1d2127; }
+  .popup-result {
+    padding: 12px 12px 4px; text-align: center; font-size: 1.5rem; font-weight: 700; line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  .popup-result.long { font-size: 1.05rem; }
+  .popup-actions { display: flex; justify-content: flex-end; gap: 4px; padding: 6px 8px 8px; }
+  .popup-actions button { font-size: .78rem; padding: 4px 9px; border-radius: 6px; color: #1d2127; }
+  .popup-actions button:hover:not(:disabled) { background: #eef0f2; }
+  .popup-actions button.primary { background: #1d2127; color: #fff; }
+  .popup-actions button.primary:hover:not(:disabled) { background: #1d2127; opacity: .85; }
+
+  /* ---------- round ---------- */
+  .round {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 18px;
+    padding: 12px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+  }
+  .round .pill { font-size: .95rem; max-width: 100%; overflow-wrap: anywhere; }
+  .round .pill b { font-weight: 500; color: var(--muted); margin-right: 6px; }
+  .round .done { background: var(--ink); color: var(--bg); }
+  .round .done:hover:not(:disabled) { background: var(--ink); opacity: .85; }
+  .round .failed { color: var(--spend); }
+  .round .clear { color: var(--muted); }
+
+  .status {
+    min-height: 1.5em; margin: 12px 0 28px; text-align: center;
+    font-size: .9rem; color: var(--muted);
+  }
+
+  /* ---------- players ---------- */
+  .player { display: flex; flex-direction: column; gap: 8px; position: relative; }
+  .player.current .score-box { box-shadow: inset 0 0 0 2px var(--ink); }
+  .player.picked .score-box { box-shadow: inset 0 0 0 2px var(--spend); }
+  .player.leader .score { color: var(--lead); }
+
+  .name {
+    width: 100%; height: 34px; text-align: center;
+    font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--ink);
+    background: transparent; border: 0; border-bottom: 1px solid transparent; border-radius: 0;
+  }
+  .name:hover { border-bottom-color: var(--hair); }
+  .name:focus { outline: none; border-bottom-color: var(--ink); }
+  .name::placeholder { color: var(--muted); font-weight: 500; }
+
+  .score-box {
+    position: relative; background: var(--surface); border-radius: 20px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 12px; padding: 18px 14px 14px;
+  }
+  .nudge { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; }
+  .nudge button {
+    width: 28px; height: 28px; padding: 0; border-radius: 50%;
+    font-weight: 700; font-size: 1rem; line-height: 1; color: var(--muted);
+    touch-action: manipulation; user-select: none;
+  }
+  .nudge button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+  .pause {
+    position: absolute; top: 10px; left: 10px;
+    font-size: .78rem; padding: 4px 9px; color: var(--muted);
+  }
+  .pause:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+  .player.paused .pause { background: var(--ink); color: var(--bg); }
+  .player.paused .pause:hover:not(:disabled) { background: var(--ink); opacity: .85; }
+  .player.paused .name, .player.paused .score, .player.paused .nudge,
+  .player.paused .earn, .player.paused .spend { opacity: .4; }
+  .score-label { font-size: .8rem; color: var(--muted); }
+  .score {
+    width: 100%; text-align: center; font: inherit; font-size: 3.4rem; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+    background: transparent; border: none; padding: 0;
+    -moz-appearance: textfield;
+  }
+  .score::-webkit-outer-spin-button, .score::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .score:focus { outline: none; }
+  .score:focus-visible { outline: 2px solid var(--focus); border-radius: 8px; }
+  .score.debt { color: var(--spend); }
+
+  .earn { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; width: 100%; }
+  .earn button { padding: 6px 0; background: var(--bg); }
+  .earn button:hover:not(:disabled) { background: var(--surface-2); }
+
+  .spend { display: grid; gap: 2px; width: 100%; }
+  .spend button {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .88rem; font-weight: 500;
+  }
+  .spend button:hover:not(:disabled) { background: var(--surface-2); }
+  .spend .cost { font-weight: 700; color: var(--spend); font-variant-numeric: tabular-nums; }
+  .spend .fail { color: var(--spend); margin-top: 4px; }
+
+  .remove {
+    position: absolute; top: -4px; right: -4px; z-index: 1;
+    border-radius: 50%; width: 26px; height: 26px; padding: 0; line-height: 1;
+    font-size: .9rem; color: var(--muted); background: var(--bg);
+    opacity: 0; transition: opacity .15s;
+  }
+  .player:hover .remove, .remove:focus-visible { opacity: 1; }
+  @media (hover: none) { .remove { opacity: .6; } }
+
+  /* ---------- dares editor ---------- */
+  .dares { margin-top: 40px; border-radius: 16px; }
+  .dares[open] { background: var(--surface); padding: 6px 16px 16px; }
+  .dares summary {
+    cursor: pointer; font-weight: 600; color: var(--muted); list-style: none;
+    width: max-content; padding: 6px 10px; margin-left: -10px; border-radius: 8px;
+  }
+  .dares summary::-webkit-details-marker { display: none; }
+  .dares summary::after { content: ' \25BE'; }
+  .dares[open] summary::after { content: ' \25B4'; }
+  .dares summary:hover { color: var(--ink); }
+
+  .odds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
+  .odds-total { font-size: .85rem; color: var(--muted); margin-right: auto; }
+  .odds-total.warn { color: var(--spend); font-weight: 600; }
+  button.small { font-size: .8rem; padding: 4px 10px; background: var(--bg); }
+  #balance { color: var(--spend); }
+
+  .dare-list { display: grid; gap: 4px; margin: 10px 0 14px; padding: 0; list-style: none; }
+  .dare-list li {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg); border-radius: 10px; padding: 5px 6px 5px 12px; font-size: .92rem;
+  }
+  .dare-list li.dare-empty { background: none; padding: 0; color: var(--muted); }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .dare-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .dare-list .chance { font-size: .78rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dare-list .chance:empty { display: none; }
+  .dare-list li button { width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); flex: none; }
+  .dare-list li button:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+
+  .pct-field { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-weight: 600; }
+  .pct-field input {
+    width: 72px; font: inherit; font-weight: 700; color: var(--ink); text-align: right;
+    background: var(--surface); border: 0; border-radius: 6px; padding: 4px 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dare-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .dare-add > input {
+    flex: 1; min-width: 160px; font: inherit; color: var(--ink); background: var(--bg);
+    border: 0; border-radius: 8px; padding: 7px 10px;
+  }
+  .dare-add .pct-field input { background: var(--bg); padding: 7px 8px; }
+  .dare-add button { background: var(--ink); color: var(--bg); }
+  .dare-add button:hover:not(:disabled) { background: var(--ink); opacity: .85; }
+
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>W.O.N Dares</h1>
+    <div class="toolbar">
+      <div class="mode" role="group" aria-label="Wheel type">
+        <button id="modeBuiltin" aria-pressed="true">Built-in wheels</button>
+        <button id="modeWon" aria-pressed="false">Wheel of Names</button>
+      </div>
+      <button id="undo" disabled>Undo</button>
+      <button id="add">Add player</button>
+      <button id="reset">Reset scores</button>
+      <button id="sound" title="Wheel sounds" aria-label="Wheel sounds">🔊</button>
+      <button id="setWheel" hidden>Wheel link</button>
+      <button id="spinAll" title="Spin all (Ctrl+Enter)">Spin all</button>
+      <span class="save-state" id="saveState">Saved</span>
+    </div>
+  </header>
+
+  <section class="wheels" id="wheels"></section>
+
+  <div class="round" id="round"></div>
+  <div class="status" id="status" aria-live="polite"></div>
+
+  <section class="players" id="players"></section>
+
+  <details class="dares" id="dares">
+    <summary>Edit dares (<span id="dareCount">0</span>)</summary>
+    <div class="odds-row" id="oddsRow"></div>
+    <ul class="dare-list" id="dareList"></ul>
+    <form class="dare-add" id="dareForm">
+      <input id="dareInput" placeholder="Add a dare…" maxlength="80" autocomplete="off">
+      <label class="pct-field" title="Leave blank to use the average chance"><input id="darePct" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="auto" aria-label="Chance for the new dare in percent"><span>%</span></label>
+      <button type="submit">Add</button>
+    </form>
+  </details>
+</main>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<script>
+  const KEY = 'won-dares-v3';
+  const DEFAULT_WHEEL = 'https://wheelofnames.com/4tp-wz6';
+  // Each dare has its own chance in percent
+  const DEFAULT_DARES = [
+    { text: 'Jumping jacks', pct: 20 },
+    { text: 'Throw pen near teacher', pct: 12 },
+    { text: 'Scream', pct: 13 },
+    { text: 'Pause when asking question', pct: 20 },
+    { text: 'fake trip', pct: 20 },
+    { text: 'Stand on chair', pct: 15 },
+  ];
+  const EARN = [1, 2, 3, 4, 5];
+  const FAIL_PENALTY = 10;
+  const SPEND = [
+    { id: 'reroll', label: 'Reroll', cost: 10 },
+    { id: 'skip',   label: 'Skip',   cost: 20 },
+    { id: 'pass',   label: 'Make someone else do it', cost: 30 },
+  ];
+  // Vertical centre of each wheel on the Wheel of Names page (unscaled px)
+  const WON_CENTERS = [275, 811, 1347];
+  const COLORS = ['#f5d77e', '#a3dcb7', '#93c2ee', '#c9abe5'];
+
+  const blank = (name = '') => ({ name, score: 0 });
+  const emptyRound = () => ({ player: null, dare: null, points: null });
+  const defaults = () => ({
+    mode: 'builtin',
+    sound: true,
+    wheel: DEFAULT_WHEEL,
+    players: [blank('Aayush'), blank('Saheb'), blank('William')],
+    dares: DEFAULT_DARES.map(d => ({ ...d })),
+    chanceFormat: 'percent',
+    round: emptyRound(),
+  });
+
+  // Older saves stored dares as plain text or with rarity tiers: give each one a percentage,
+  // keeping the chance it had before
+  function migrateDares(dares, tiers) {
+    const old = { common: 60, rare: 25, epic: 12, legendary: 3, ...(tiers || {}) };
+    const list = (Array.isArray(dares) ? dares : []).map(d => typeof d === 'string' ? { text: d } : { ...d });
+    const count = {};
+    list.forEach(d => { if (typeof d.pct !== 'number' && d.rarity) count[d.rarity] = (count[d.rarity] || 0) + 1; });
+    const total = Object.keys(count).reduce((sum, t) => sum + Math.max(0, old[t] || 0), 0);
+    list.forEach(d => {
+      if (typeof d.pct !== 'number' && d.rarity && total > 0) {
+        d.pct = Math.round(Math.max(0, old[d.rarity] || 0) / total * 100 / count[d.rarity] * 100) / 100;
+      }
+      delete d.rarity;
+    });
+    list.forEach(d => { if (typeof d.pct !== 'number') d.pct = Math.round(100 / list.length * 100) / 100; });
+    return list;
+  }
+
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY));
+      if (saved) {
+        const s = { ...defaults(), ...saved };
+        s.dares = migrateDares(s.dares, s.rarity);
+        delete s.rarity;
+        return s;
+      }
+      // first visit: bring over names and scores from the other version of this page
+      const older = JSON.parse(localStorage.getItem('won-dares-v2')) || JSON.parse(localStorage.getItem('won-dares-v1'));
+      if (older && older.players) {
+        return { ...defaults(), wheel: older.wheel || DEFAULT_WHEEL,
+                 players: older.players.map(p => ({ name: p.name, score: p.score })) };
+      }
+    } catch {}
+    return defaults();
+  }
+  let state = load();
+
+  const $ = id => document.getElementById(id);
+  const wheelsEl = $('wheels'), playersEl = $('players'), statusEl = $('status');
+  const roundEl = $('round'), saveStateEl = $('saveState'), undoBtn = $('undo');
+  const history = [];
+  let saveTimer, statusTimer;
+
+  function save() {
+    saveStateEl.textContent = 'Saving…';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(state));
+        saveStateEl.textContent = 'Saved';
+      } catch {
+        saveStateEl.textContent = 'Save failed';
+      }
+    }, 250);
+  }
+
+  function snapshot() {
+    history.push(JSON.stringify(state));
+    if (history.length > 50) history.shift();
+    undoBtn.disabled = false;
+  }
+
+  function say(msg) {
+    statusEl.textContent = msg;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => { statusEl.textContent = ''; }, 8000);
+  }
+
+  const label = i => (state.players[i] && state.players[i].name.trim()) || `Player ${i + 1}`;
+
+  // ================= sound =================
+  let audio;
+  function beep(freq, dur, vol = 0.05, type = 'square', when = 0) {
+    if (!state.sound) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const t = audio.currentTime + when;
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + dur + 0.01);
+    } catch {}
+  }
+  const tick = () => beep(1100, 0.03, 0.04);
+  const fanfare = () => [523, 659, 784].forEach((f, i) => beep(f, 0.18, 0.06, 'triangle', i * 0.09));
+
+  // ================= built-in wheels =================
+  const TAU = Math.PI * 2;
+  const mod = (a, n) => ((a % n) + n) % n;
+
+  const builtin = [
+    { caption: 'Who', empty: () => state.players.length ? 'Everyone is paused' : 'Add players',
+      entries: () => state.players.map((_, i) => label(i)),
+      // paused players get no slice, so they can't be picked
+      weights: () => state.players.map(p => p.paused ? 0 : 1),
+      result: (text, i) => { state.round.player = i; } },
+    { caption: 'Dare', empty: 'Add dares',
+      entries: () => state.dares.map(d => d.text),
+      weights: () => dareChances(),
+      result: text => { state.round.dare = text; },
+      removable: true },
+    { caption: 'Points', empty: '',
+      entries: () => EARN.map(String),
+      result: text => { state.round.points = Number(text); } },
+  ];
+  builtin.forEach(w => {
+    w.rot = Math.random() * TAU;
+    w.spinning = false;
+    w.hint = true;      // show "Click to spin" until the first spin
+    w.winner = null;    // slice that won the last spin (others get dimmed)
+    w.flick = 0;        // pointer kick when it passes a peg
+  });
+
+  function colorFor(i, n) {
+    // avoid the last slice matching the first one
+    if (n > 1 && i === n - 1 && n % COLORS.length === 1) return COLORS[1];
+    return COLORS[i % COLORS.length];
+  }
+  const sliceColor = (w, i, n) => w.color ? w.color(i) : colorFor(i, n);
+
+  // Chance (in %) of each dare. If the percentages don't add up to 100 they're scaled to fit.
+  function dareChances() {
+    const pcts = state.dares.map(d => Math.max(0, Number(d.pct) || 0));
+    const total = pcts.reduce((a, b) => a + b, 0);
+    if (total <= 0) return state.dares.map(() => 100 / state.dares.length);
+    return pcts.map(p => p / total * 100);
+  }
+
+  // Start/end angle of every slice (relative to the wheel's rotation)
+  function sliceAngles(w, n) {
+    const weights = w.weights ? w.weights() : Array(n).fill(1);
+    const sum = weights.reduce((a, b) => a + b, 0) || 1;
+    let a = 0;
+    return weights.map(x => { const s = a; a += x / sum * TAU; return [s, a]; });
+  }
+
+  const FONT = '"Quicksand", system-ui, -apple-system, "Segoe UI", sans-serif';
+  const font = size => `700 ${size}px ${FONT}`;
+
+  // Biggest single line that fits; else two balanced lines; else a shortened line
+  function layoutLabel(ctx, text, maxW, chord) {
+    const maxFont = Math.max(11, Math.min(26, chord * 0.6));
+    for (let s = maxFont; s >= 13; s--) {
+      ctx.font = font(s);
+      if (ctx.measureText(text).width <= maxW) return { lines: [text], size: s };
+    }
+    const words = text.split(/\s+/);
+    if (words.length > 1) {
+      for (let s = Math.min(maxFont, chord * 0.36); s >= 10; s--) {
+        ctx.font = font(s);
+        let best = null;
+        for (let k = 1; k < words.length; k++) {
+          const a = words.slice(0, k).join(' '), b = words.slice(k).join(' ');
+          const wide = Math.max(ctx.measureText(a).width, ctx.measureText(b).width);
+          if (wide <= maxW && (!best || wide < best.wide)) best = { lines: [a, b], size: s, wide };
+        }
+        if (best) return best;
+      }
+    }
+    const s = Math.min(maxFont, 12);
+    ctx.font = font(s);
+    let t = text;
+    while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return { lines: [t === text ? t : t.trimEnd() + '…'], size: s };
+  }
+
+  // Text bent around the hub, like Wheel of Names' "Click to spin"
+  function arcText(ctx, text, r, top) {
+    const widths = [...text].map(ch => ctx.measureText(ch).width);
+    const total = widths.reduce((a, b) => a + b, 0) / r;
+    let a = top ? -Math.PI / 2 - total / 2 : Math.PI / 2 + total / 2;
+    [...text].forEach((ch, i) => {
+      const span = widths[i] / r;
+      const at = top ? a + span / 2 : a - span / 2;
+      ctx.save();
+      ctx.rotate(at);
+      ctx.translate(r, 0);
+      ctx.rotate(top ? Math.PI / 2 : -Math.PI / 2);
+      ctx.strokeText(ch, 0, 0);
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+      a = top ? a + span : a - span;
+    });
+  }
+
+  function slicePath(ctx, r, a0, a1) {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, a0, a1); ctx.closePath();
+  }
+
+  function drawWheel(w) {
+    const canvas = w.canvas;
+    if (!canvas) return;
+    const css = canvas.clientWidth || 256;
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(css * dpr)) {
+      canvas.width = canvas.height = Math.round(css * dpr);
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, css, css);
+
+    const c = css / 2, R = c - 4, inner = R, hub = R * 0.14;
+    const items = w.entries();
+    const n = items.length;
+
+    ctx.save();
+    ctx.translate(c, c);
+
+    // slices can be different sizes (dare chances, paused players), and a 0% slice isn't drawn at all
+    const angles = n ? sliceAngles(w, n) : [];
+    const visible = i => angles[i][1] - angles[i][0] > 1e-6;
+    const shown = angles.filter((_, i) => visible(i)).length;
+
+    if (shown === 0) {
+      ctx.beginPath(); ctx.arc(0, 0, inner, 0, TAU);
+      ctx.fillStyle = '#eceef1'; ctx.fill();
+      ctx.fillStyle = '#7a818b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = font(17);
+      ctx.fillText(typeof w.empty === 'function' ? w.empty() : w.empty, 0, 0);
+      ctx.restore();
+      return;
+    }
+
+    for (let i = 0; i < n; i++) {
+      if (!visible(i)) continue;
+      slicePath(ctx, inner, w.rot + angles[i][0], w.rot + angles[i][1]);
+      ctx.fillStyle = sliceColor(w, i, n); ctx.fill();
+    }
+
+    // thin white dividers
+    if (shown > 1) {
+      ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < n; i++) {
+        if (!visible(i)) continue;
+        const a = w.rot + angles[i][0];
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * inner, Math.sin(a) * inner); ctx.stroke();
+      }
+    }
+
+    // labels, written outward along each slice (skipped when a slice is too thin to read)
+    const textEnd = inner - 10;
+    const maxW = textEnd - hub - 8;
+    ctx.fillStyle = '#1b1b1b'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let i = 0; i < n; i++) {
+      if (!visible(i)) continue;
+      const span = angles[i][1] - angles[i][0];
+      const chord = shown === 1 ? inner : 2 * (hub + maxW * 0.5) * Math.sin(Math.min(span, Math.PI) / 2);
+      if (chord < 8) continue;
+      const { lines, size } = layoutLabel(ctx, items[i], maxW, chord);
+      ctx.font = font(size);
+      ctx.save();
+      ctx.rotate(w.rot + (angles[i][0] + angles[i][1]) / 2);
+      if (lines.length === 1) ctx.fillText(lines[0], textEnd, 0);
+      else lines.forEach((ln, k) => ctx.fillText(ln, textEnd, (k - 0.5) * size * 1.08));
+      ctx.restore();
+    }
+
+
+    // after a spin, dim everything except the winner
+    if (w.winner !== null && !w.spinning && shown > 1) {
+      ctx.fillStyle = 'rgba(20,28,36,.42)';
+      for (let i = 0; i < n; i++) {
+        if (i === w.winner || !visible(i)) continue;
+        slicePath(ctx, inner, w.rot + angles[i][0], w.rot + angles[i][1]);
+        ctx.fill();
+      }
+    }
+
+    // hairline edge
+    ctx.beginPath(); ctx.arc(0, 0, inner - 0.5, 0, TAU);
+    ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.lineWidth = 1; ctx.stroke();
+
+    // hub
+    ctx.beginPath(); ctx.arc(0, 0, hub, 0, TAU);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.stroke();
+    if (!w.spinning) {
+      ctx.fillStyle = '#7a818b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = font(Math.round(hub * 0.5));
+      ctx.fillText('SPIN', 0, 1);
+    }
+
+    // "Click to spin" until the first spin
+    if (w.hint && !w.spinning) {
+      ctx.font = font(Math.round(R * 0.12));
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.35)';
+      ctx.fillStyle = '#fff';
+      arcText(ctx, 'Click to spin', hub + R * 0.2, true);
+    }
+
+    // pointer at 3 o'clock, kicked a little each time a slice passes
+    ctx.save();
+    ctx.translate(c - 2, 0);
+    ctx.rotate(-w.flick * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(-24, 0);
+    ctx.lineTo(0, -10);
+    ctx.lineTo(0, 10);
+    ctx.closePath();
+    ctx.fillStyle = '#e5484d'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // Which slice is under the pointer (at angle 0)
+  function indexAtPointer(w, n) {
+    const a = mod(-w.rot, TAU);
+    const angles = sliceAngles(w, n);
+    const i = angles.findIndex(([s, e]) => a >= s && a < e);
+    return i >= 0 ? i : angles.findLastIndex(([s, e]) => e > s);
+  }
+
+  function spin(w) {
+    const n = w.entries().length;
+    if (w.spinning || n === 0) return;
+    const angles = sliceAngles(w, n);
+    if (!angles.some(([s, e]) => e - s > 1e-6)) return;   // nothing to land on, e.g. everyone is paused
+    closePopup(w);
+    w.spinning = true;
+    w.hint = false;
+    w.winner = null;
+    // pick a slice with odds matching its size, then land somewhere inside it
+    let r = Math.random() * TAU, pick = angles.findIndex(([s, e]) => r >= s && r < e);
+    if (pick < 0) pick = angles.findLastIndex(([s, e]) => e > s);
+    const [s0, s1] = angles[pick];
+    const within = 0.15 + Math.random() * 0.7;
+    const target = -(s0 + (s1 - s0) * within);       // rotation that puts `pick` under the pointer
+    const start = w.rot;
+    const end = start + TAU * (5 + Math.floor(Math.random() * 3)) + mod(target - start, TAU);
+    const dur = 4600 + Math.random() * 1400;
+    const t0 = performance.now();
+    let lastIdx = indexAtPointer(w, n);
+
+    const frame = now => {
+      const t = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - t, 4);
+      w.rot = start + (end - start) * eased;
+      w.flick *= 0.8;
+      const items = w.entries().length;
+      if (items) {
+        const idx = indexAtPointer(w, items);
+        if (idx !== lastIdx) { lastIdx = idx; w.flick = 1; tick(); }
+      }
+      drawWheel(w);
+      if (t < 1) return requestAnimationFrame(frame);
+      w.rot = mod(end, TAU);
+      w.spinning = false;
+      w.flick = 0;
+      const list = w.entries();
+      if (!list.length) return drawWheel(w);
+      const won = indexAtPointer(w, list.length);
+      w.winner = won;
+      drawWheel(w);
+      w.result(list[won], won);
+      showPopup(w, list[won], sliceColor(w, won, list.length));
+      fanfare();
+      renderRound(); markCurrent(); save();
+    };
+    requestAnimationFrame(frame);
+  }
+
+  const spinAll = () => builtin.forEach((w, i) => setTimeout(() => spin(w), i * 180));
+
+  // ================= confetti =================
+  function confetti(x, y) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cv = $('confetti'), ctx = cv.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const bits = Array.from({ length: 90 }, () => ({
+      x, y, vx: (Math.random() - 0.5) * 10, vy: -Math.random() * 10 - 3,
+      r: Math.random() * TAU, vr: (Math.random() - 0.5) * 0.3,
+      s: 6 + Math.random() * 5, c: COLORS[Math.floor(Math.random() * COLORS.length)],
+    }));
+    const t0 = performance.now(), life = 1800;
+    const step = now => {
+      const t = now - t0;
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      if (t > life) return;
+      ctx.globalAlpha = 1 - t / life;
+      bits.forEach(b => {
+        b.vy += 0.28; b.vx *= 0.99; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r);
+        ctx.fillStyle = b.c; ctx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
+        ctx.restore();
+      });
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function closePopup(w) {
+    if (w.popup) { w.popup.remove(); w.popup = null; }
+  }
+
+  function showPopup(w, text, color) {
+    closePopup(w);
+    const pop = document.createElement('div');
+    pop.className = 'popup';
+    const head = 'We have a winner!';
+    pop.innerHTML = `
+      <div class="popup-card" role="dialog" aria-label="Result">
+        <div class="popup-head">${head}</div>
+        <div class="popup-result"></div>
+        <div class="popup-actions">
+          <button class="close">Close</button>
+          ${w.removable ? '<button class="primary rm">Remove</button>' : ''}
+        </div>
+      </div>`;
+    pop.querySelector('.popup-head').style.background = color;
+    const res = pop.querySelector('.popup-result');
+    res.textContent = text;
+    res.classList.toggle('long', text.length > 14);
+    pop.addEventListener('click', e => {
+      e.stopPropagation();
+      if (e.target.closest('.rm')) {
+        const i = state.dares.findIndex(d => d.text === text);
+        if (i >= 0) { snapshot(); state.dares.splice(i, 1); renderDares(); drawWheel(w); save(); }
+      }
+      if (e.target === pop || e.target.closest('button')) closePopup(w);
+    });
+    w.circle.appendChild(pop);
+    w.popup = pop;
+  }
+
+  // ================= wheel area =================
+  function renderWheels() {
+    wheelsEl.innerHTML = '';
+    builtin.forEach(w => { w.canvas = null; w.circle = null; w.popup = null; });
+
+    if (state.mode === 'won') {
+      WON_CENTERS.forEach((c, i) => {
+        const slot = document.createElement('div');
+        slot.className = 'wheel-slot';
+        slot.innerHTML = `<div class="wheel-circle"></div><span class="wheel-caption">${builtin[i].caption}</span>`;
+        const circle = slot.firstElementChild;
+        circle.style.setProperty('--frame-h', `${c * 2}px`);
+        circle.style.setProperty('--frame-y', `calc(var(--circle) / 2 - ${c}px * var(--frame-scale))`);
+        const frame = document.createElement('iframe');
+        frame.title = 'Wheel of Names';
+        frame.allow = 'autoplay';
+        frame.scrolling = 'no';
+        frame.src = state.wheel;
+        circle.appendChild(frame);
+        wheelsEl.appendChild(slot);
+      });
+      return;
+    }
+
+    builtin.forEach(w => {
+      const slot = document.createElement('div');
+      slot.className = 'wheel-slot';
+      slot.innerHTML = `
+        <div class="wheel-circle builtin" role="button" tabindex="0" aria-label="Spin the ${w.caption} wheel" title="Click to spin">
+          <canvas></canvas>
+        </div>
+        <span class="wheel-caption">${w.caption}</span>`;
+      w.circle = slot.querySelector('.wheel-circle');
+      w.canvas = slot.querySelector('canvas');
+      w.circle.addEventListener('click', () => spin(w));
+      w.circle.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (w.popup) closePopup(w); else spin(w);
+        }
+      });
+      wheelsEl.appendChild(slot);
+    });
+    requestAnimationFrame(() => builtin.forEach(drawWheel));
+  }
+  const redrawWheel = i => { if (state.mode === 'builtin') drawWheel(builtin[i]); };
+
+  // ================= dares =================
+  // Simplest fraction (denominator up to 100) for a percentage, e.g. 12.5 -> "1/8"
+  function asFraction(p) {
+    if (p <= 0) return '0/1';
+    if (p >= 100) return '1/1';
+    const x = p / 100;
+    let best = { n: 1, d: 1, err: Infinity };
+    for (let d = 1; d <= 100; d++) {
+      const n = Math.max(1, Math.round(x * d));
+      const err = Math.abs(n / d - x);
+      if (err < best.err - 1e-12) best = { n, d, err };
+      if (err < 0.00005) break;   // exact to two decimal places of a percent
+    }
+    return `${best.err < 0.00005 ? '' : '\u2248'}${best.n}/${best.d}`;
+  }
+  const fmtChance = p => state.chanceFormat === 'fraction' ? asFraction(p) : `${p.toFixed(2)}%`;
+  const round2 = x => Math.round(x * 100) / 100;
+  const pctTotal = () => state.dares.reduce((sum, d) => sum + Math.max(0, Number(d.pct) || 0), 0);
+
+  // Round to 2 decimals and put any leftover on the biggest dare so the total is exactly 100
+  function fixRounding() {
+    state.dares.forEach(d => { d.pct = round2(d.pct); });
+    const diff = round2(100 - pctTotal());
+    const big = state.dares.reduce((a, d) => d.pct > a.pct ? d : a);
+    big.pct = round2(big.pct + diff);
+  }
+
+  // Scale every dare so they add up to exactly 100%, keeping their proportions
+  function balanceDares() {
+    if (!state.dares.length) return;
+    snapshot();
+    const total = pctTotal();
+    state.dares.forEach(d => {
+      d.pct = total > 0 ? Math.max(0, Number(d.pct) || 0) / total * 100 : 100 / state.dares.length;
+    });
+    fixRounding();
+    say('Balanced: the chances now add up to 100%.');
+    renderDares(); redrawWheel(1); save();
+  }
+
+  // Give every dare the same chance
+  function evenDares() {
+    if (!state.dares.length) return;
+    snapshot();
+    state.dares.forEach(d => { d.pct = 100 / state.dares.length; });
+    fixRounding();
+    say('Every dare now has the same chance.');
+    renderDares(); redrawWheel(1); save();
+  }
+
+  // Total and buttons above the list (built once)
+  function buildOddsRow() {
+    $('oddsRow').innerHTML = `
+      <span class="odds-total" id="oddsTotal"></span>
+      <button type="button" class="small" id="balance" title="Scale every dare so they add up to 100%, keeping their proportions">Balance to 100%</button>
+      <button type="button" class="small" id="even">Make all equal</button>
+      <button type="button" class="small" id="chanceFormat"></button>`;
+    $('balance').addEventListener('click', balanceDares);
+    $('even').addEventListener('click', evenDares);
+    $('chanceFormat').addEventListener('click', () => {
+      state.chanceFormat = state.chanceFormat === 'fraction' ? 'percent' : 'fraction';
+      updateOdds(); save();
+    });
+  }
+
+  // Refresh the total and each dare's real chance without rebuilding the list,
+  // so typing in a percentage box keeps its focus
+  function updateOdds() {
+    const n = state.dares.length;
+    const total = pctTotal();
+    const off = n > 0 && Math.abs(total - 100) > 0.005;
+    $('oddsTotal').textContent = !n ? ''
+      : `Total ${round2(total)}%${off ? ' (should be 100%, so the wheel scales the chances to fit)' : ''}`;
+    $('oddsTotal').classList.toggle('warn', off);
+    $('balance').hidden = !off;
+    $('even').hidden = n < 2;
+    $('chanceFormat').hidden = !n;
+    $('chanceFormat').textContent = state.chanceFormat === 'fraction' ? 'Show as %' : 'Show as X/X';
+    const chances = dareChances();
+    $('dareList').querySelectorAll('.chance').forEach((el, i) => {
+      // only shown when it says something the typed number doesn't
+      const shown = state.chanceFormat === 'fraction' || off ? fmtChance(chances[i]) : '';
+      el.textContent = shown && off ? `actual ${shown}` : shown;
+      el.title = `${chances[i].toFixed(2)}% (${asFraction(chances[i])}) chance of landing on this dare`;
+    });
+  }
+
+  function renderDares() {
+    $('dares').hidden = state.mode !== 'builtin';
+    $('dareCount').textContent = state.dares.length;
+    const list = $('dareList');
+    list.innerHTML = '';
+    if (!state.dares.length) {
+      list.innerHTML = '<li class="dare-empty">No dares yet. Add one below.</li>';
+    }
+    state.dares.forEach((d, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="dare-text"></span>
+        <span class="chance"></span>
+        <label class="pct-field"><input class="pct" type="number" min="0" max="100" step="0.01" inputmode="decimal"><span>%</span></label>
+        <button class="rm" title="Remove dare">\u00d7</button>`;
+      li.querySelector('.swatch').style.background = colorFor(i, state.dares.length);
+      li.querySelector('.dare-text').textContent = d.text;
+      const input = li.querySelector('.pct');
+      input.value = round2(Math.max(0, Number(d.pct) || 0));
+      input.setAttribute('aria-label', `Chance for ${d.text} in percent`);
+      input.addEventListener('focus', snapshot);
+      input.addEventListener('input', () => {
+        d.pct = Math.max(0, Number(input.value) || 0);
+        updateOdds(); redrawWheel(1); save();
+      });
+      li.querySelector('.rm').setAttribute('aria-label', `Remove ${d.text}`);
+      li.querySelector('.rm').addEventListener('click', () => {
+        snapshot(); state.dares.splice(i, 1); renderDares(); redrawWheel(1); save();
+      });
+      list.appendChild(li);
+    });
+    updateOdds();
+  }
+
+  $('dareForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const input = $('dareInput'), pctInput = $('darePct');
+    const text = input.value.trim();
+    if (!text) return;
+    // blank chance: use the average of the others (or 100% for the first dare)
+    const typed = pctInput.value.trim();
+    const pct = typed !== '' ? Math.max(0, Number(typed) || 0)
+      : state.dares.length ? round2(pctTotal() / state.dares.length) : 100;
+    snapshot(); state.dares.push({ text, pct });
+    input.value = ''; pctInput.value = '';
+    renderDares(); redrawWheel(1); save();
+  });
+  // ================= round =================
+  function renderRound() {
+    if (state.mode !== 'builtin') { roundEl.hidden = true; return; }
+    roundEl.hidden = false;
+    const r = state.round;
+    const who = r.player !== null && state.players[r.player] ? label(r.player) : null;
+    const ready = who !== null && r.points !== null;
+    roundEl.innerHTML = `
+      <span class="pill"><b>Who</b><span class="v"></span></span>
+      <span class="pill"><b>Dare</b><span class="v"></span></span>
+      <span class="pill"><b>Points</b><span class="v"></span></span>
+      <button class="done" ${ready ? '' : 'disabled'}></button>
+      <button class="failed" ${who !== null ? '' : 'disabled'}></button>
+      <button class="clear">Clear</button>`;
+    const v = roundEl.querySelectorAll('.v');
+    v[0].textContent = who || '—';
+    v[1].textContent = r.dare || '—';
+    v[2].textContent = r.points !== null ? r.points : '—';
+    const done = roundEl.querySelector('.done');
+    done.textContent = ready ? `✓ Done: +${r.points} to ${who}` : '✓ Done';
+    done.addEventListener('click', () => {
+      snapshot();
+      state.players[r.player].score += r.points;
+      say(`${who} did ${r.dare ? `"${r.dare}"` : 'the dare'}: +${r.points}`);
+      const box = playersEl.children[r.player].querySelector('.score-box').getBoundingClientRect();
+      confetti(box.left + box.width / 2, box.top + 40);
+      endRound();
+    });
+    const failed = roundEl.querySelector('.failed');
+    failed.textContent = who !== null ? `✗ Couldn't do it: −${FAIL_PENALTY} to ${who}` : `✗ Couldn't do it`;
+    failed.addEventListener('click', () => fail(r.player));
+    roundEl.querySelector('.clear').addEventListener('click', () => { snapshot(); endRound(); });
+  }
+
+  // Start a fresh round: clear the results and un-dim the wheels
+  function endRound() {
+    state.round = emptyRound();
+    builtin.forEach(w => { w.winner = null; drawWheel(w); });
+    renderRound(); refresh(); save();
+  }
+
+  // ================= players =================
+  function markCurrent() {
+    [...playersEl.children].forEach((card, i) => {
+      card.classList.toggle('current', state.mode === 'builtin' && state.round.player === i);
+    });
+  }
+
+  function refresh() {
+    const top = Math.max(...state.players.map(p => p.score));
+    const solo = state.players.filter(p => p.score === top).length === 1 && top > 0;
+    [...playersEl.children].forEach((card, i) => {
+      const p = state.players[i];
+      const score = card.querySelector('.score');
+      score.value = p.score;
+      score.classList.toggle('debt', p.score < 0);
+      card.classList.toggle('leader', solo && p.score === top);
+      card.classList.toggle('paused', !!p.paused);
+      card.querySelector('.score-label').textContent = p.paused ? 'Paused' : 'Score';
+      const pause = card.querySelector('.pause');
+      pause.textContent = p.paused ? 'Resume' : 'Pause';
+      pause.setAttribute('aria-pressed', String(!!p.paused));
+      pause.title = p.paused ? `Put ${label(i)} back on the Who wheel` : `Take ${label(i)} off the Who wheel while they're not playing`;
+      card.querySelectorAll('.spend button[data-cost]').forEach(b => {
+        b.disabled = p.score < Number(b.dataset.cost) || (b.dataset.id === 'pass' && !hasOtherActive(i));
+      });
+    });
+    markCurrent();
+  }
+
+  // Is anyone other than player i still playing?
+  const hasOtherActive = i => state.players.some((q, j) => j !== i && !q.paused);
+
+  function spend(i, action) {
+    const p = state.players[i];
+    if (p.score < action.cost) return;
+    if (action.id === 'pass' && !hasOtherActive(i)) return;
+    snapshot();
+    p.score -= action.cost;
+    const who = label(i);
+    document.querySelectorAll('.player.picked').forEach(c => c.classList.remove('picked'));
+
+    if (action.id === 'pass') {
+      const others = state.players.map((_, j) => j).filter(j => j !== i && !state.players[j].paused);
+      const pick = others[Math.floor(Math.random() * others.length)];
+      if (state.mode === 'builtin') state.round.player = pick;
+      else playersEl.children[pick].classList.add('picked');
+      say(`${who} spent ${action.cost}: ${label(pick)} has to do the dare!`);
+    } else if (action.id === 'skip') {
+      say(`${who} spent ${action.cost} to skip the dare.`);
+      if (state.mode === 'builtin') return endRound();
+    } else {
+      if (state.mode === 'builtin') {
+        state.round.dare = null;
+        say(`${who} spent ${action.cost} to reroll the dare.`);
+        spin(builtin[1]);
+      } else {
+        say(`${who} spent ${action.cost} to reroll. Spin again!`);
+      }
+    }
+    renderRound(); refresh(); save();
+  }
+
+  // Couldn't finish the dare: always allowed, even if it puts them in debt
+  function fail(i) {
+    if (!state.players[i]) return;
+    snapshot();
+    state.players[i].score -= FAIL_PENALTY;
+    const s = state.players[i].score;
+    say(`${label(i)} couldn't do it: −${FAIL_PENALTY}${s < 0 ? ` (now ${s}, in debt)` : ''}`);
+    if (state.round.player === i) endRound();
+    else { renderRound(); refresh(); save(); }
+  }
+
+  // Click for one step; press and hold to keep going
+  function holdToRepeat(btn, step) {
+    let timer, repeat, held = false;
+    const stop = () => { clearTimeout(timer); clearInterval(repeat); };
+    btn.addEventListener('pointerdown', () => {
+      held = false;
+      stop();
+      timer = setTimeout(() => {
+        held = true; snapshot(); step();
+        repeat = setInterval(step, 80);
+      }, 450);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+    btn.addEventListener('click', () => {
+      if (held) { held = false; return; }
+      snapshot(); step();
+    });
+  }
+
+  function renderPlayers() {
+    playersEl.innerHTML = '';
+    state.players.forEach((p, i) => {
+      const card = document.createElement('div');
+      card.className = 'player';
+      card.innerHTML = `
+        <button class="remove" title="Remove player" aria-label="Remove player">×</button>
+        <input class="name" placeholder="Name" maxlength="40">
+        <div class="score-box">
+          <button class="pause" aria-pressed="false">Pause</button>
+          <div class="nudge">
+            <button data-n="-1" title="Minus 1 (hold to repeat)" aria-label="Minus 1">−</button>
+            <button data-n="1" title="Plus 1 (hold to repeat)" aria-label="Plus 1">+</button>
+          </div>
+          <span class="score-label">Score</span>
+          <input class="score" type="number" inputmode="numeric" aria-label="Score">
+          <div class="earn">${EARN.map(n => `<button data-d="${n}">+${n}</button>`).join('')}</div>
+          <div class="spend">${SPEND.map(a =>
+            `<button data-id="${a.id}" data-cost="${a.cost}"><span>${a.label}</span><span class="cost">−${a.cost}</span></button>`
+          ).join('')}
+            <button class="fail"><span>Couldn't do it</span><span class="cost">−${FAIL_PENALTY}</span></button>
+          </div>
+        </div>`;
+
+      const name = card.querySelector('.name');
+      name.value = p.name;
+      name.addEventListener('focus', snapshot, { once: true });
+      name.addEventListener('input', () => {
+        p.name = name.value; redrawWheel(0); renderRound(); save();
+      });
+
+      const score = card.querySelector('.score');
+      score.addEventListener('focus', () => snapshot());
+      score.addEventListener('input', () => {
+        p.score = Number(score.value) || 0;
+        const v = score.value; refresh(); score.value = v; save();
+      });
+
+      card.querySelectorAll('.earn button').forEach(b => b.addEventListener('click', () => {
+        snapshot(); p.score += Number(b.dataset.d); refresh(); save();
+      }));
+      card.querySelectorAll('.spend button[data-cost]').forEach((b, k) => b.addEventListener('click', () => spend(i, SPEND[k])));
+      card.querySelector('.fail').addEventListener('click', () => fail(i));
+      card.querySelector('.pause').addEventListener('click', () => {
+        snapshot();
+        p.paused = !p.paused;
+        if (p.paused && state.round.player === i) { state.round.player = null; builtin[0].winner = null; }
+        say(p.paused ? `${label(i)} is paused and won't come up on the Who wheel.` : `${label(i)} is back in the game.`);
+        refresh(); renderRound(); redrawWheel(0); save();
+      });
+      card.querySelectorAll('.nudge button').forEach(b => holdToRepeat(b, () => {
+        p.score += Number(b.dataset.n); refresh(); save();
+      }));
+
+      card.querySelector('.remove').addEventListener('click', () => {
+        if (!confirm(`Remove ${label(i)}?`)) return;
+        snapshot();
+        state.players.splice(i, 1);
+        const r = state.round;
+        if (r.player === i) r.player = null;
+        else if (r.player !== null && r.player > i) r.player -= 1;
+        renderPlayers(); renderRound(); redrawWheel(0); save();
+      });
+
+      playersEl.appendChild(card);
+    });
+    refresh();
+  }
+
+  // ================= toolbar =================
+  function renderMode() {
+    const b = state.mode === 'builtin';
+    $('modeBuiltin').setAttribute('aria-pressed', b);
+    $('modeWon').setAttribute('aria-pressed', !b);
+    $('spinAll').hidden = !b;
+    $('sound').hidden = !b;
+    $('setWheel').hidden = b;
+    $('sound').textContent = state.sound ? '🔊' : '🔇';
+    renderWheels(); renderDares(); renderRound(); markCurrent();
+  }
+
+  function setMode(m) {
+    if (state.mode === m) return;
+    state.mode = m;
+    document.querySelectorAll('.player.picked').forEach(c => c.classList.remove('picked'));
+    renderMode(); save();
+  }
+  $('modeBuiltin').addEventListener('click', () => setMode('builtin'));
+  $('modeWon').addEventListener('click', () => setMode('won'));
+
+  $('spinAll').addEventListener('click', spinAll);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && state.mode === 'builtin' && !e.target.closest('input')) {
+      e.preventDefault(); spinAll();
+    }
+  });
+  $('sound').addEventListener('click', () => {
+    state.sound = !state.sound;
+    $('sound').textContent = state.sound ? '🔊' : '🔇';
+    save();
+  });
+
+  $('setWheel').addEventListener('click', () => {
+    const url = prompt('Wheel of Names link:', state.wheel);
+    if (url === null) return;
+    const clean = url.trim() || DEFAULT_WHEEL;
+    if (!/^https:\/\/wheelofnames\.com\//i.test(clean)) { alert('Please paste a https://wheelofnames.com/ link.'); return; }
+    snapshot(); state.wheel = clean; renderWheels(); save();
+  });
+
+  undoBtn.addEventListener('click', () => {
+    const prev = history.pop();
+    if (!prev) return;
+    const before = state;
+    // mode and sound are settings, not game moves, so undo leaves them alone
+    state = { ...JSON.parse(prev), mode: before.mode, sound: before.sound, chanceFormat: before.chanceFormat };
+    undoBtn.disabled = history.length === 0;
+    if (state.mode === 'won' && state.wheel !== before.wheel) renderWheels();
+    builtin.forEach(w => { if (w.canvas) drawWheel(w); });
+    renderDares(); renderPlayers(); renderRound();
+    say('Undone.');
+    save();
+  });
+
+  $('add').addEventListener('click', () => {
+    snapshot(); state.players.push(blank()); renderPlayers(); redrawWheel(0); save();
+    playersEl.lastElementChild.querySelector('.name').focus();
+  });
+  $('reset').addEventListener('click', () => {
+    if (!confirm('Reset every score to 0?')) return;
+    snapshot(); state.players.forEach(p => p.score = 0); refresh(); save();
+  });
+
+  const redrawAll = () => builtin.forEach(w => { if (w.canvas) drawWheel(w); });
+  window.addEventListener('resize', redrawAll);
+
+  buildOddsRow();
+  renderPlayers();
+  renderMode();
+  // redraw once the wheel font has arrived
+  if (document.fonts) document.fonts.load(font(16)).then(redrawAll, () => {});
+</script>
+</body>
+</html>
